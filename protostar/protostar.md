@@ -124,3 +124,71 @@ int main(int argc, char **argv)
 
 }
 ```
+
+Reading through this program source, we get some idea of what is happening.
+The program is calling `getenv` with "GREENIE" as a parameter. If this is NULL, it exits, but if it isn't NULL, it copies it into a buffer.
+When you think about it, this isn't really different from Stack 1. This is just a new form of input. We can control things like the environment variables with the unix command `export`
+
+Like before we want to take into account the endianness of the computer. So we will enter 64 characters to fill the buffer, and then *0x0d0a0d0a* backwards -> 0x0a0d0a0d.
+
+We can use a python script to generate the string
+```python
+python -c 'print("A"*64 + "\x0a\x0d\x0a\x0d")'
+```
+We can run this python script inline, using backticks \` \`.
+So if we run ```export `python -c 'print("A"*64 + "\x0a\x0d\x0a\x0d")` ```
+Then execute the program. We win!
+
+## Stack 3
+
+The provided code:
+```C
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
+
+void win()  
+{
+  printf("code flow successfully changed\n");
+}
+
+int main(int argc, char **argv)  
+{
+  volatile int (*fp)();
+  char buffer[64];
+
+  fp = 0;
+
+  gets(buffer);
+`
+  if(fp) {
+    printf("calling function pointer, jumping to 0x%08x\n", fp);
+    fp();
+  }
+}
+```
+
+This level starts to introduce the idea about code redirection, and possible *remote code execution*.
+
+Let's first see what this program does.
+It starts by defining two variables. A function pointer, and an array of characters. We already know from earlier levels that we can easily overwrite values on the stack with the `gets` call. But this time there is no check to see if we set the variable correctly. 
+
+How do function pointers work?
+If we declare a function pointer `int (*fp)();`, it will (in a 32 bit machine) take **4** bytes of storage, just like an int. However when we call `fp()`, It will treat the value stored in memory as an address, and jump to that address, and execute any code stored at that address.
+
+So what address should we jump to?
+Well we want the code at `win()` to execute, so let's find the address of that in the binary file, and then jump to that!
+
+Firstly to find the address of any label *(win, main, are called labels)* we need to use a program called objdump.
+`objdump -t ./stack3 | grep win`
+The -t parameter means only print out the addresses of functions/global variables, not the actual code. 
+We pipe the output of this into grep, and search for any lines containing 'win'
+
+This returns win at the address **0x8048424**
+
+This address is just a number. Now that we have a number to overwrite, this level becomes the same as previous levels.
+```python
+python -c 'print "A"*64 + "\x24\x84\x04\x08"'
+```
+Remember *little endianness**
