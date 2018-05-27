@@ -44,7 +44,7 @@ print 'A'*64 + 'BBBB'
 ```
 
 
-##Stack 1
+## Stack 1
 
 Here is the supplied C Code
 ```C
@@ -79,7 +79,9 @@ This is a hex number, 0x61 = 91.
 Let's take a step back and talk about *endianness*. Computers are really lazy.
 Modern computers store data in many ways. The most common is in a format called **little endian**.
 Little endian stores the least significant byte first. This means that if you wanted to store the binary number *01101001*, it would be stored as *01101001*. But if you wanted to store a 4 byte word, (0xFF = 11111111, 0x00 = 00000000), In memory storing **0x123456** would look like **0x563412**. Little endianness changes the location of entire *bytes*, not the *bits*.
+
 This challenge is extremely similar to Stack 0. But in order to get the number *0x61626364* to appear correctly, we would have to enter it in a little endian manner. This means enterring **0x64636261**.
+
 The program is expecting characters not numbers, so we have to convert each byte, into a character. For example 0x61 = *[*.
 But this is annoying to do, python has a nice short hand to doing it, if you just `print '\x61'` it will print [. 
 
@@ -89,7 +91,7 @@ print "A"*64 + "\x64\x63\x62\x61"
 ```
 To pipe this input into our program we can do `python -c 'print "A"*64 + "\x64\x63\x62\x61"' | ./stack1`
 
-##Stack 2
+## Stack 2
 
 Supplied C Code is
 ```C
